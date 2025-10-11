@@ -1,0 +1,10 @@
+# === Dependências principais ===
+requests
+pandas
+tqdm
+urllib3
+python-dotenv[cli]
+invoke
+
+# === Dependências opcionais (dev/teste) ===
+pytest
