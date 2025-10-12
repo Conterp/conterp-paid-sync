@@ -123,7 +123,7 @@ def enviar_para_monday(df_novos_detalhes):
     Envia os novos pagamentos enriquecidos para o Monday.
     """
     ids_criados = []
-    total_por_grupo = {"Padrão": 0, "MOVBCO": 0}
+    total_por_grupo = {"Pagamentos": 0, "MOVBCO": 0}
 
     for _, linha in tqdm(df_novos_detalhes.iterrows(), total=len(df_novos_detalhes), desc="⬆️ Upload", unit="item"):
         item_id = criar_item_monday(linha)

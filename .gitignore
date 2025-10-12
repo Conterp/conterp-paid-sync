@@ -22,7 +22,6 @@ ENV/
 # 🔒 Configuração e secrets
 # ============================
 .env
-*.env.*
 secrets.json
 
 # ============================

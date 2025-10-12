@@ -1,4 +1,8 @@
 import os
+from dotenv import load_dotenv
+
+# Carrega as variáveis do .env (na raiz do projeto)
+load_dotenv()
 
 # ===========================
 # 🔐 Configurações Alterdata
