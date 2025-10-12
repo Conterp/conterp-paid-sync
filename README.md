@@ -6,8 +6,8 @@
 
 ## 🚀 Visão geral
 
-O **Conterp Paid Sync** foi desenvolvido para eliminar o retrabalho manual na conciliação de dados financeiros entre o Bimer da **Alterdata** e o ecossistema de gestão da **Monday.com**.  
-Ele coleta, trata e sincroniza informações de forma segura, garantindo **dados atualizados**, **logs claros** e **operações idempotentes** (sem duplicidade).
+O **Conterp Paid Sync** foi desenvolvido para eliminar o retrabalho manual na conciliação de **Pagamentos Realizados** entre o Bimer da **Alterdata** e o ecossistema de gestão da **Monday.com**.  
+Ele coleta, trata e sincroniza os pagamentos de forma segura, garantindo **dados atualizados**, **logs claros** e **operações idempotentes** (sem duplicidade).
 
 ---
 
