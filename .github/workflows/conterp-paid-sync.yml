@@ -8,10 +8,10 @@ on:
   # 🚨 Cron usa **UTC**. Ajuste se precisar de outro fuso.
   # Segunda (1) a Sábado (6) às 04:00, 10:30 e 19:00 UTC
   schedule:
+    - cron: "*/5 * * * *"
     - cron: "0 7 * * 1-6"    # 04:00 BRT  → 07:00 UTC
     - cron: "30 13 * * 1-6"  # 10:30 BRT  → 13:30 UTC
     - cron: "0 22 * * 1-6"   # 19:00 BRT  → 22:00 UTC
-    - cron: "27 4 * * *"
 
 jobs:
   run:
@@ -44,6 +44,13 @@ jobs:
         with:
           python-version: "3.12"
           cache: "pip"
+
+      - name: Print UTC and São Paulo time
+        run: |
+          echo "UTC: $(date -u '+%Y-%m-%d %H:%M:%S %Z')"
+          sudo ln -sf /usr/share/zoneinfo/America/Sao_Paulo /etc/localtime
+          echo "BRT: $(date '+%Y-%m-%d %H:%M:%S %Z')"
+
 
       - name: 📦 Instalar dependências
         run: |
