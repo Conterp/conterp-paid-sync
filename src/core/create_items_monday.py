@@ -134,7 +134,7 @@ def enviar_para_monday(df_novos_detalhes):
             if numero_titulo.startswith("MOVBCO"):
                 total_por_grupo["MOVBCO"] += 1
             else:
-                total_por_grupo["Padrão"] += 1
+                total_por_grupo["Pagamentos"] += 1
 
         time.sleep(0.3)
 
