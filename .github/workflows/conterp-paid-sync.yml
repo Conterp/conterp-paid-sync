@@ -1,5 +1,5 @@
 # .github/workflows/conterp-paid-sync.yml
-name: CONTERP Paid Sync
+name: Conterp Paid Sync
 
 on:
   # Executa manualmente pela aba "Actions"
