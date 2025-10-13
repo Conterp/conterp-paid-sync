@@ -6,19 +6,20 @@
 
 ## 🚀 Visão geral
 
-O **Conterp Paid Sync** foi desenvolvido para eliminar o retrabalho manual na conciliação de **Pagamentos Realizados** entre o Bimer da **Alterdata** e o ecossistema de gestão da **Monday.com**.  
-Ele coleta, trata e sincroniza os pagamentos de forma segura, garantindo **dados atualizados**, **logs claros** e **operações idempotentes** (sem duplicidade).
+O **Conterp Paid Sync** elimina o retrabalho manual na conciliação de **Pagamentos Realizados** entre o Bimer da **Alterdata** e a **Monday.com**.  
+A automação coleta, trata e sincroniza os pagamentos de forma segura, garantindo **dados atualizados**, **logs rastreáveis** e **execuções agendadas em produção**.
 
 ---
 
 ## 🧠 Principais recursos
 
 - 🔄 **Sincronização bidirecional** entre Alterdata e Monday  
-- 🧾 **Tratamento inteligente de lançamentos** (por grupos, status)  
+- 🧾 **Tratamento inteligente de lançamentos** (por grupos e status)  
 - 🧰 **Configuração simplificada** via `.env`  
-- 📊 **Feedback em tempo real** com `tqdm` (barra de progresso)  
-- 🧩 **Arquitetura modular e extensível**  
-- 🧪 **Testes automatizados** com `pytest`  
+- 📊 **Progresso em tempo real** com `tqdm`  
+- 🐳 **Execução isolada com Docker**  
+- ⏰ **Agendamento automático via cron (produção AWS)**  
+- 🧩 **Arquitetura modular e extensível**
 
 ---
 
@@ -26,31 +27,22 @@ Ele coleta, trata e sincroniza os pagamentos de forma segura, garantindo **dados
 
 ```
 conterp-paid-sync/
-├── .env.example # Exemplo de variáveis de ambiente
-├── requirements.txt # Dependências principais e de desenvolvimento
-├── src/ # Código-fonte principal
-│ ├── config/ # Configurações globais e variáveis do sistema
-│ │ ├── init.py
-│ │ └── settings.py
-│ │
-│ ├── core/ # Lógica central de sincronização
-│ │ ├── init.py
-│ │ ├── auth.py # Autenticação e tokens
-│ │ ├── compare_ids.py # Comparação de registros Alterdata × Monday
-│ │ ├── create_items_monday.py # Criação de itens no Monday
-│ │ ├── fetch_alterdata.py # Busca de dados da API Alterdata
-│ │ ├── fetch_cost_centers.py # Coleta de centros de custo
-│ │ ├── fetch_details.py # Detalhamento e normalização de dados
-│ │ └── fetch_monday.py # Comunicação com a API Monday.com
-│ │
-│ ├── utils/ # Funções auxiliares e utilitários
-│ │ ├── init.py
-│ │ └── date_filters.py # Filtros e formatação de datas
-│ │
-│ └── main.py # Ponto de entrada da aplicação
+├── .env.example             # Exemplo de variáveis de ambiente
+├── requirements.txt         # Dependências principais
+├── src/                     # Código-fonte principal
+│   ├── config/              # Configurações globais
+│   ├── core/                # Lógica central de sincronização
+│   ├── utils/               # Funções auxiliares
+│   └── main.py              # Ponto de entrada
 │
-├── .gitignore # Regras de exclusão do Git
-└── README.md # Documentação principal
+├── Dockerfile               # Imagem da automação
+├── docker-compose.yml       # Orquestra execução do container
+├── run.sh                   # Script agendado pelo cron (gera logs com data)
+├── logs/                    # Armazena logs de cada execução
+│   ├── conterp-paid-sync.log
+│   └── cron_2025-10-13_01-45.log
+│
+└── README.md
 ```
 
 ---
@@ -63,26 +55,56 @@ git clone git@github.com:JoaoCarser/conterp-paid-sync.git
 cd conterp-paid-sync
 ```
 
-### 2. Crie e configure o `.env`
+### 2. Configure o `.env`
 Copie o arquivo de exemplo:
 ```bash
 cp .env.example .env
 ```
 Preencha com suas credenciais da **Alterdata** e da **Monday.com**.
 
-> 💡 Dica UX: tokens de API são sensíveis. Evite versionar o `.env` — ele já está ignorado no `.gitignore`.
+> 💡 Tokens de API são sensíveis — o `.env` já está no `.gitignore`.
 
 ---
 
 ## 🧭 Execução
 
-### Via Python diretamente
+### 🔹 Localmente (modo desenvolvimento)
 ```bash
-python src/main.py
+docker compose up
 ```
 
-### Monitorar progresso
-A barra de progresso (`tqdm`) mostrará o status de sincronização em tempo real.
+### 🔹 Em produção (AWS EC2)
+O script `run.sh` executa o container e salva os logs automaticamente:
+
+```bash
+/opt/automations/conterp-paid-sync/run.sh
+```
+
+Os logs ficam em:
+```
+/opt/automations/conterp-paid-sync/logs/
+```
+
+---
+
+## ⏰ Agendamento automático (cron)
+
+Na EC2, o cron agenda a automação para execução recorrente:
+
+```
+# Segunda a sexta: 04:00, 10:30 e 19:00
+0 4 * * 1-5 /opt/automations/conterp-paid-sync/run.sh
+30 10 * * 1-5 /opt/automations/conterp-paid-sync/run.sh
+0 19 * * 1-5 /opt/automations/conterp-paid-sync/run.sh
+
+# Sábado: 10:30
+30 10 * * 6 /opt/automations/conterp-paid-sync/run.sh
+```
+
+Cada execução gera um log nomeado por data/hora, ex:
+```
+logs/cron_2025-10-13_04-00.log
+```
 
 ---
 
@@ -90,12 +112,11 @@ A barra de progresso (`tqdm`) mostrará o status de sincronização em tempo rea
 
 | Dependência | Versão mínima |
 |--------------|----------------|
-| Python       | 3.9+ |
-| requests     | latest |
-| pandas       | latest |
-| python-dotenv | latest |
+| Docker       | 24+ |
+| Docker Compose | plugin ativo |
+| Python       | 3.12 (na imagem base) |
 
-Instale todas as dependências com:
+Instalação local (opcional):
 ```bash
 pip install -r requirements.txt
 ```
@@ -104,12 +125,12 @@ pip install -r requirements.txt
 
 ## 🔒 Segurança
 
-- Nunca exponha suas credenciais da Alterdata ou Monday.com.
-- As variáveis sensíveis são carregadas via `.env`.
-- O script valida chaves antes da execução.
+- Credenciais seguras via `.env`
+- Execução isolada em container
+- Logs centralizados e versionados por data
 
 ---
 
 ## 🤝 Autor
 
-João Carser
+**João Carser**  
