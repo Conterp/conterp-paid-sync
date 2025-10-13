@@ -1,0 +1,12 @@
+version: "3.9"
+
+services:
+  app:
+    build: .                      # Usa o Dockerfile desta pasta
+    container_name: conterp-paid-sync
+    env_file: .env                # Carrega variáveis de ambiente
+    tty: true                     #  cria um terminal interativo
+    stdin_open: true              #  mantém entrada aberta
+    restart: "no"                 # Roda e finaliza (ideal pra jobs)
+    volumes:
+      - ./logs:/app/logs
