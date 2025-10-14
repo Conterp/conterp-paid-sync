@@ -22,6 +22,10 @@ MONDAY_COLUMN_ID = os.getenv("MONDAY_COLUMN_ID")
 MONDAY_GROUP_PADRAO = os.getenv("MONDAY_GROUP_PADRAO")
 MONDAY_GROUP_MOVBCO = os.getenv("MONDAY_GROUP_MOVBCO")
 
+# ===========================
+# 🔐 Configurações N8N
+# ===========================
+N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL")
 
 # ===========================
 # 🔍 Validação opcional
@@ -34,7 +38,8 @@ def check_required_envs():
             "ALTERDATA_BASE_URL",
             "MONDAY_API_TOKEN",
             "MONDAY_BOARD_ID",
-            "MONDAY_BASE_URL"
+            "MONDAY_BASE_URL",
+            "N8N_WEBHOOK_URL",
         ] if not globals().get(var)
     ]
     if missing:
