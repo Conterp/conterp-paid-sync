@@ -92,6 +92,7 @@ def fetch_monday_ids():
                 )
                 all_items.append(
                     {
+                        "Item ID": item["id"],       # <- interno, necessário para delete_item()
                         "Group": group_data["title"],
                         "Numero AF": item["name"],
                         "ID": col_val,

@@ -21,6 +21,7 @@ from src.core.fetch_monday import fetch_monday_ids
 from src.core.compare_ids import find_new_ids
 from src.core.fetch_details import enrich_titles
 from src.core.create_items_monday import enviar_para_monday
+from src.core.delete_duplicates_monday import delete_duplicate_items
 
 
 
@@ -90,8 +91,16 @@ def main():
     print("\n🚀 Enviando novos títulos para o Monday...")
     enviar_para_monday(df_enriquecido)
 
-    print("\n🏁 Execução concluída com sucesso!")
+    # 9️⃣ Pós-processamento de segurança: limpeza de duplicados
+    print("\n🧹 Verificando e limpando duplicados no Monday...")
 
+    try:
+        delete_duplicate_items()
+        print("✅ Limpeza de duplicados concluída com sucesso.")
+    except Exception as e:
+        print(f"⚠️ Falha ao executar limpeza de duplicados: {e}")
+
+    print("\n🏁 Execução concluída com sucesso!")
 
 if __name__ == "__main__":
     main()

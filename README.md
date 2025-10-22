@@ -19,6 +19,7 @@ A automação coleta, trata e sincroniza os pagamentos de forma segura, garantin
 - 📊 **Progresso em tempo real** com `tqdm`  
 - 🐳 **Execução isolada com Docker**  
 - ⏰ **Agendamento automático via cron (produção AWS)**  
+- 💬 **Envio automático de relatórios ao Email via n8n**  
 - 🧩 **Arquitetura modular e extensível**
 
 ---
@@ -33,11 +34,13 @@ conterp-paid-sync/
 │   ├── config/              # Configurações globais
 │   ├── core/                # Lógica central de sincronização
 │   ├── utils/               # Funções auxiliares
+│   ├── postprocess/         # 📤 Pós-processamento (envio de logs ao n8n)
+│   │   └── send_log_to_n8n.py
 │   └── main.py              # Ponto de entrada
 │
 ├── Dockerfile               # Imagem da automação
 ├── docker-compose.yml       # Orquestra execução do container
-├── run.sh                   # Script agendado pelo cron (gera logs com data)
+├── run.sh.example           # 🔹 Exemplo de execução local (modelo)
 ├── logs/                    # Armazena logs de cada execução
 │   ├── conterp-paid-sync.log
 │   └── cron_2025-10-13_01-45.log
@@ -51,7 +54,7 @@ conterp-paid-sync/
 
 ### 1. Clone o repositório
 ```bash
-git clone git@github.com:JoaoCarser/conterp-paid-sync.git
+git clone git@github.com:Conterp/conterp-paid-sync.git
 cd conterp-paid-sync
 ```
 
@@ -60,9 +63,14 @@ Copie o arquivo de exemplo:
 ```bash
 cp .env.example .env
 ```
-Preencha com suas credenciais da **Alterdata** e da **Monday.com**.
 
-> 💡 Tokens de API são sensíveis — o `.env` já está no `.gitignore`.
+Preencha com suas credenciais da **Alterdata**, **Monday.com** e o **webhook do n8n**:
+
+```env
+N8N_WEBHOOK_URL=https://seu-endereco-n8n/webhook/conterp-paid-sync
+```
+
+> 💡 Tokens e URLs são sensíveis — o `.env` já está no `.gitignore`.
 
 ---
 
@@ -74,16 +82,76 @@ docker compose up
 ```
 
 ### 🔹 Em produção (AWS EC2)
-O script `run.sh` executa o container e salva os logs automaticamente:
+O script `run.sh` executa o container, gera os logs e envia o resumo automaticamente ao **n8n**, que repassa para o **Email**.
 
 ```bash
 /opt/automations/conterp-paid-sync/run.sh
 ```
 
-Os logs ficam em:
+Logs são salvos em:
 ```
 /opt/automations/conterp-paid-sync/logs/
 ```
+
+---
+
+## 🧰 Exemplo de `run.sh.example`
+
+> Este modelo mostra como configurar o script localmente para testes.
+
+```bash
+#!/bin/bash
+# Caminho base da automação
+cd /opt/automations/conterp-paid-sync
+
+# Define timezone manualmente (Brasil)
+export TZ="America/Sao_Paulo"
+
+# Gera nome do log com data/hora atual
+LOG_FILE="logs/cron_$(date '+%Y-%m-%d_%H-%M').log"
+
+# Executa a automação e salva o log
+/usr/bin/docker compose up --build --abort-on-container-exit > "$LOG_FILE" 2>&1
+
+echo "📤 Enviando resumo do log para o n8n..."
+
+docker run --rm   -v /workspaces/conterp-paid-sync/logs:/app/logs   -v /workspaces/conterp-paid-sync/src:/app   --env-file /workspaces/conterp-paid-sync/.env   -e LOG_PATH="/app/logs/teste_envio.log"   -w /app python:3.12-slim /bin/bash -c "pip install requests python-dotenv >/dev/null 2>&1 && python -m postprocess.send_log_to_n8n"
+
+echo "✅ Log enviado com sucesso!"
+```
+
+> 🧠 **Dica:**  
+> Em produção, o `run.sh` real usa caminhos do EC2 (`/opt/automations/...`),  
+> mas o `.example` serve para testes locais no VS Code ou Codespaces.
+
+---
+
+## 💬 Integração com o n8n e Gmail
+
+Ao final da execução, o **Conterp Paid Sync** envia um resumo do log ao **n8n**, que processa e encaminha ao **Email**, formatado pela assistente **JAMI**.
+
+Exemplo de mensagem enviada:
+
+```
+Tudo pronto por aqui 🚀  
+
+📅 14/10/2025 às 19:18  
+💼 Pagamentos no Monday  
+• Antes: *4070*  
+• Depois: *4106* (+*36*)  
+•  Duplicados removidos: 0
+
+📊 Grupos:  
+• Pagamentos: *36*  
+• MOVBCO: *0*  
+
+🧾 Total Alterdata (semestre): *4106*  
+
+Processo finalizado com sucesso 🌟 Sistemas 100% alinhados.
+```
+
+> ✨ A **JAMI** aplica UX writing e formatação visual para que as mensagens sejam  
+> curtas, elegantes e claras, mantendo a leitura confortável no Email.
 
 ---
 
@@ -108,29 +176,16 @@ logs/cron_2025-10-13_04-00.log
 
 ---
 
-## 🧰 Requisitos
-
-| Dependência | Versão mínima |
-|--------------|----------------|
-| Docker       | 24+ |
-| Docker Compose | plugin ativo |
-| Python       | 3.12 (na imagem base) |
-
-Instalação local (opcional):
-```bash
-pip install -r requirements.txt
-```
-
----
-
 ## 🔒 Segurança
 
-- Credenciais seguras via `.env`
-- Execução isolada em container
-- Logs centralizados e versionados por data
+- Credenciais seguras via `.env`  
+- Execução isolada em container  
+- Logs centralizados e versionados por data  
+- Envio de informações resumidas ao n8n (sem dados sensíveis)
 
 ---
 
 ## 🤝 Autor
 
 **João Carser**  
+[github.com/JoaoCarser](https://github.com/JoaoCarser)
