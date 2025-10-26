@@ -1,4 +1,3 @@
-# src/core/delete_items_monday.py
 import requests
 import pandas as pd
 from typing import Iterable, List, Dict, Optional
