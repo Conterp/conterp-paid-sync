@@ -1,37 +1,64 @@
+# src/core/compare_ids.py
+from __future__ import annotations
 import pandas as pd
 
+def _norm_id_series(s: pd.Series) -> pd.Series:
+    """
+    Normaliza IDs para comparação:
+    - string, strip, upper
+    - preserva NaN
+    """
+    if s is None or s.empty:
+        return pd.Series(dtype="object")
+    s_str = s.astype(str)
+    s_norm = s_str.where(~s.isna(), None)
+    return pd.Series(s_norm).str.strip().str.upper()
 
 def find_new_ids(df_alterdata: pd.DataFrame, df_monday: pd.DataFrame) -> pd.DataFrame:
     """
-    Compara IDs da Alterdata e Monday e retorna apenas os novos.
-    Mantém as colunas ['ID', 'DataBaixa', 'Pagina'].
-
-    Args:
-        df_alterdata (pd.DataFrame): DataFrame vindo da Alterdata (com colunas ID, DataBaixa, Pagina)
-        df_monday (pd.DataFrame): DataFrame com IDs existentes no Monday (coluna 'ID')
-
-    Returns:
-        pd.DataFrame: Subconjunto de df_alterdata com os novos IDs.
+    Retorna títulos da Alterdata que ainda NÃO existem no Monday.
+    Compara por coluna 'ID' normalizada.
+    Saída: colunas ['ID','DataBaixa','Pagina'] se existirem.
     """
+    desired_cols = ["ID", "DataBaixa", "Pagina"]
 
-    # === Validação inicial ===
-    if df_alterdata.empty:
-        print("⚠️ Nenhum dado na Alterdata — retornando vazio.")
-        return pd.DataFrame(columns=["ID", "DataBaixa", "Pagina"])
+    if df_alterdata is None or df_alterdata.empty:
+        return pd.DataFrame(columns=desired_cols)
 
-    if df_monday.empty:
-        print("⚠️ Nenhum dado encontrado no Monday — retornando todos da Alterdata.")
-        return df_alterdata[["ID", "DataBaixa", "Pagina"]].copy()
+    if df_monday is None or df_monday.empty:
+        existing = [c for c in desired_cols if c in df_alterdata.columns]
+        return df_alterdata[existing].copy()
 
-    # === Normalização de IDs ===
-    df_alterdata["ID"] = df_alterdata["ID"].astype(str).str.strip().str.upper()
-    df_monday["ID"] = df_monday["ID"].astype(str).str.strip().str.upper()
+    alt = df_alterdata.copy()
+    mon = df_monday.copy()
+    alt["ID_norm"] = _norm_id_series(alt["ID"])
+    mon["ID_norm"] = _norm_id_series(mon["ID"])
 
-    # === Comparação ===
-    novos = df_alterdata[~df_alterdata["ID"].isin(df_monday["ID"])].copy()
+    novos = alt.loc[~alt["ID_norm"].isin(mon["ID_norm"])].copy()
+    existing = [c for c in desired_cols if c in novos.columns]
+    return novos[existing]
 
-    # === Organização final ===
-    novos = novos[["ID", "DataBaixa", "Pagina"]]  # garante apenas as colunas desejadas
-    print(f"🆔 Total de novos IDs encontrados: {len(novos)}")
+def find_monday_orphans(df_alter_filtrado: pd.DataFrame,
+                        df_monday: pd.DataFrame) -> pd.DataFrame:
+    """
+    Retorna itens do Monday cujo 'ID' NÃO aparece no df_alter_filtrado (mesma janela).
+    Compara por coluna 'ID' normalizada.
+    Saída preferida (se existirem): ['Item ID','Group','Numero AF','ID'].
+    """
+    if df_monday is None or df_monday.empty:
+        return pd.DataFrame(columns=["Item ID", "Group", "Numero AF", "ID"])
 
-    return novos
+    if df_alter_filtrado is None or df_alter_filtrado.empty:
+        # se Alterdata filtrado está vazio, tudo do Monday vira candidato
+        dm = df_monday.copy()
+        cols = [c for c in ["Item ID", "Group", "Numero AF", "ID"] if c in dm.columns]
+        return dm[cols].reset_index(drop=True)
+
+    dm = df_monday.copy()
+    dm["ID_norm"] = _norm_id_series(dm["ID"])
+    alt_ids = set(_norm_id_series(df_alter_filtrado["ID"]).dropna())
+
+    orfaos = dm.loc[~dm["ID_norm"].isin(alt_ids)].copy()
+    preferred = ["Item ID", "Group", "Numero AF", "ID"]
+    cols = [c for c in preferred if c in orfaos.columns] or ["ID_norm"]
+    return orfaos[cols].reset_index(drop=True)

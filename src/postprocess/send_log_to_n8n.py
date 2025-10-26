@@ -35,8 +35,9 @@ def summarize_log(log_path):
     grupo_movbco = int(extract(r"MOVBCO:\s*([0-9]+) itens", "0"))
     pagamentos_semestre_api = int(extract(r"Total de Pagamentos no Semestre Atual:\s*([0-9]+)", "0"))
     duplicados_detectados = int(extract(r"Total de linhas duplicadas excluídas:\s*([0-9]+)", "0"))
+    orfaos_excluidos = int(extract(r"Excluindo\s*([0-9]+)\s*órfãos", "0"))
 
-    monday_total_depois = monday_total_antes + novos_pagamentos - duplicados_detectados
+    monday_total_depois = monday_total_antes + novos_pagamentos - duplicados_detectados - orfaos_excluidos
 
     # 4️⃣ Monta o resumo
     summary = {
