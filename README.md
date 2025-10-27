@@ -13,82 +13,113 @@ A automação coleta, trata e sincroniza os pagamentos de forma segura, garantin
 
 ## 🧠 Principais recursos
 
-- 🔄 **Sincronização bidirecional** entre Alterdata e Monday  
-- 🧾 **Tratamento inteligente de lançamentos** (por grupos e status)  
-- 🧰 **Configuração simplificada** via `.env`  
+- 🔄 **Sincronização automatizada** de Pagamentos Realizados do **Alterdata (Bimer)** para **Monday.com**  
+- 🧾 **Tratamento inteligente** dos lançamentos (grupos, status e colunas do board)  
+- 🧰 **Configuração simples** via `.env`  
 - 📊 **Progresso em tempo real** com `tqdm`  
 - 🐳 **Execução isolada com Docker**  
-- ⏰ **Agendamento automático via cron (produção AWS)**  
-- 💬 **Envio automático de relatórios ao Email via n8n**  
-- 🧩 **Arquitetura modular e extensível**
+- ⏰ **Agendamento via cron** (produção em AWS/EC2)  
+- 💬 **Envio automático de relatórios** ao Email via **n8n**  
+- 🧩 **Arquitetura modular e extensível**  
+- 🧹 **Higiene de dados no Monday**: remoção de **duplicidades por ID** e exclusão de **itens órfãos** a cada execução, garantindo **idempotência**
 
 ---
 
 ## 🧩 Estrutura do projeto
 
+### Itens na **raiz** do repositório
+
 ```
 conterp-paid-sync/
-├── .env.example             # Exemplo de variáveis de ambiente
-├── requirements.txt         # Dependências principais
-├── src/                     # Código-fonte principal
-│   ├── config/              # Configurações globais
-│   ├── core/                # Lógica central de sincronização
-│   ├── utils/               # Funções auxiliares
-│   ├── postprocess/         # 📤 Pós-processamento (envio de logs ao n8n)
-│   │   └── send_log_to_n8n.py
-│   └── main.py              # Ponto de entrada
-│
-├── Dockerfile               # Imagem da automação
-├── docker-compose.yml       # Orquestra execução do container
-├── run.sh.example           # 🔹 Exemplo de execução local (modelo)
-├── logs/                    # Armazena logs de cada execução
-│   ├── conterp-paid-sync.log
-│   └── cron_2025-10-13_01-45.log
-│
-└── README.md
+├── .env.example          # Exemplo de variáveis de ambiente
+├── .gitignore
+├── Dockerfile            # Imagem da automação (python:3.12-slim)
+├── docker-compose.yml    # Orquestra a execução do container
+├── requirements.txt      # Dependências
+├── README.md
+├── logs/                 # (gerado em runtime) diretório de logs por execução
+└── src/                  # Código-fonte principal
 ```
+
+### Árvore do `src/`
+
+```
+src/
+├── main.py                      # Ponto de entrada (pipeline fim-a-fim)
+├── config/
+│   └── settings.py              # Carrega .env e valida variáveis
+├── core/
+│   ├── auth.py                  # Login no Bimer (token)
+│   ├── fetch_cost_centers.py    # Centros de Custo (id→nome)
+│   ├── fetch_alterdata.py       # Títulos baixados (paginado + retry + paralelo)
+│   ├── fetch_details.py         # Detalhes de um título (enriquecimento)
+│   ├── fetch_monday.py          # Leitura GraphQL (paginada por cursor)
+│   ├── compare_ids.py           # Novos (A∖M) e órfãos (M∖A)
+│   ├── create_items_monday.py   # Criação de itens (GraphQL)
+│   └── delete_items_monday.py   # Remoção de duplicados e órfãos
+├── postprocess/
+│   └── send_log_to_n8n.py       # 📤 Resumo de log → n8n → Email
+└── utils/
+    ├── date_filters.py          # Intervalo do semestre atual + filtro
+    └── detect_duplicates_monday.py # Diagnóstico de duplicidade (board)
+```
+
+> 🗂️ Observação: `logs/` fica **fora** de `src/` e guarda um arquivo por execução (nomeado por data/hora).
 
 ---
 
 ## ⚙️ Configuração
 
-### 1. Clone o repositório
+### 1) Clone o repositório
 ```bash
 git clone git@github.com:Conterp/conterp-paid-sync.git
 cd conterp-paid-sync
 ```
 
-### 2. Configure o `.env`
-Copie o arquivo de exemplo:
+### 2) Configure o `.env`
+Copie o exemplo:
 ```bash
 cp .env.example .env
 ```
 
-Preencha com suas credenciais da **Alterdata**, **Monday.com** e o **webhook do n8n**:
-
+Preencha com suas credenciais da **Alterdata**, **Monday.com** e o **webhook do n8n** (exemplo ilustrativo):
 ```env
+# Alterdata / Bimer
+ALTERDATA_USER=seu.usuario
+ALTERDATA_PASS=sua.senha
+ALTERDATA_BASE_URL=https://xxxxbimerapi.alterdata.cloud
+
+# Monday.com
+MONDAY_BASE_URL=https://api.monday.com/v2
+MONDAY_API_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxx
+MONDAY_BOARD_ID=1234567890
+MONDAY_COLUMN_ID=coluna_id_primaria
+MONDAY_GROUP_PADRAO=group_default
+MONDAY_GROUP_MOVBCO=group_movbco
+
+# Observabilidade (opcional)
 N8N_WEBHOOK_URL=https://seu-endereco-n8n/webhook/conterp-paid-sync
 ```
 
-> 💡 Tokens e URLs são sensíveis — o `.env` já está no `.gitignore`.
+> 💡 O `.env` já está no `.gitignore`.
 
 ---
 
 ## 🧭 Execução
 
-### 🔹 Localmente (modo desenvolvimento)
+### 🔹 Local (desenvolvimento)
 ```bash
-docker compose up
+docker compose up --build
 ```
 
-### 🔹 Em produção (AWS EC2)
-O script `run.sh` executa o container, gera os logs e envia o resumo automaticamente ao **n8n**, que repassa para o **Email**.
-
-```bash
+### 🔹 Produção (AWS EC2)
+Use um script (ex.: `run.sh`) para executar, gerar logs e enviar o resumo ao **n8n**.  
+Exemplo de caminho no servidor:
+```
 /opt/automations/conterp-paid-sync/run.sh
 ```
 
-Logs são salvos em:
+Logs gerados em:
 ```
 /opt/automations/conterp-paid-sync/logs/
 ```
@@ -97,67 +128,60 @@ Logs são salvos em:
 
 ## 🧰 Exemplo de `run.sh.example`
 
-> Este modelo mostra como configurar o script localmente para testes.
+> Modelo para testes locais (ajuste paths conforme seu ambiente).
 
 ```bash
 #!/bin/bash
-# Caminho base da automação
+# Caminho base
 cd /opt/automations/conterp-paid-sync
 
-# Define timezone manualmente (Brasil)
+# Timezone Brasil
 export TZ="America/Sao_Paulo"
 
-# Gera nome do log com data/hora atual
+# Nome do log (data/hora)
 LOG_FILE="logs/cron_$(date '+%Y-%m-%d_%H-%M').log"
 
-# Executa a automação e salva o log
+# Executa e salva log
 /usr/bin/docker compose up --build --abort-on-container-exit > "$LOG_FILE" 2>&1
 
 echo "📤 Enviando resumo do log para o n8n..."
 
-docker run --rm   -v /workspaces/conterp-paid-sync/logs:/app/logs   -v /workspaces/conterp-paid-sync/src:/app   --env-file /workspaces/conterp-paid-sync/.env   -e LOG_PATH="/app/logs/teste_envio.log"   -w /app python:3.12-slim /bin/bash -c "pip install requests python-dotenv >/dev/null 2>&1 && python -m postprocess.send_log_to_n8n"
+docker run --rm   -v /workspaces/conterp-paid-sync/logs:/app/logs   -v /workspaces/conterp-paid-sync/src:/app   --env-file /workspaces/conterp-paid-sync/.env   -e LOG_PATH="/app/logs/teste_envio.log"   -w /app python:3.12-slim /bin/bash -c   "pip install requests python-dotenv >/dev/null 2>&1 && python -m postprocess.send_log_to_n8n"
 
-echo "✅ Log enviado com sucesso!"
+echo '✅ Log enviado com sucesso!'
 ```
 
-> 🧠 **Dica:**  
-> Em produção, o `run.sh` real usa caminhos do EC2 (`/opt/automations/...`),  
-> mas o `.example` serve para testes locais no VS Code ou Codespaces.
+> 🧠 Em produção, use os caminhos reais do EC2 (`/opt/automations/...`).
 
 ---
 
-## 💬 Integração com o n8n e Gmail
+## 💬 Integração com n8n e Email
 
-Ao final da execução, o **Conterp Paid Sync** envia um resumo do log ao **n8n**, que processa e encaminha ao **Email**, formatado pela assistente **JAMI**.
-
-Exemplo de mensagem enviada:
+Ao fim da execução, o **Conterp Paid Sync** envia um resumo do log ao **n8n**, que formata e encaminha ao **Email** (UX por **JAMI**).  
+Exemplo de mensagem:
 
 ```
-Tudo pronto por aqui 🚀  
+Tudo pronto por aqui 🚀
 
-📅 14/10/2025 às 19:18  
-💼 Pagamentos no Monday  
-• Antes: *4070*  
-• Depois: *4106* (+*36*)  
-•  Duplicados removidos: 0
+📅 14/10/2025 às 19:18
+💼 Pagamentos no Monday
+• Antes: 4070
+• Depois: 4106 (+36)
+• Duplicados removidos: 0
 
-📊 Grupos:  
-• Pagamentos: *36*  
-• MOVBCO: *0*  
+📊 Grupos:
+• Pagamentos: 36
+• MOVBCO: 0
 
-🧾 Total Alterdata (semestre): *4106*  
-
+🧾 Total Alterdata (semestre): 4106
 Processo finalizado com sucesso 🌟 Sistemas 100% alinhados.
 ```
 
-> ✨ A **JAMI** aplica UX writing e formatação visual para que as mensagens sejam  
-> curtas, elegantes e claras, mantendo a leitura confortável no Email.
-
 ---
 
-## ⏰ Agendamento automático (cron)
+## ⏰ Agendamento (cron)
 
-Na EC2, o cron agenda a automação para execução recorrente:
+Exemplo de agenda na EC2:
 
 ```
 # Segunda a sexta: 04:00, 10:30 e 19:00
@@ -169,7 +193,7 @@ Na EC2, o cron agenda a automação para execução recorrente:
 30 10 * * 6 /opt/automations/conterp-paid-sync/run.sh
 ```
 
-Cada execução gera um log nomeado por data/hora, ex:
+Cada execução gera um log nomeado por data/hora, por exemplo:
 ```
 logs/cron_2025-10-13_04-00.log
 ```
@@ -178,10 +202,10 @@ logs/cron_2025-10-13_04-00.log
 
 ## 🔒 Segurança
 
-- Credenciais seguras via `.env`  
-- Execução isolada em container  
-- Logs centralizados e versionados por data  
-- Envio de informações resumidas ao n8n (sem dados sensíveis)
+- Credenciais isoladas via `.env`  
+- Execução conteinerizada (Docker)  
+- Logs organizados por execução (sem dados sensíveis)  
+- Resumo de logs enviado ao n8n (sem vazar segredos)
 
 ---
 
