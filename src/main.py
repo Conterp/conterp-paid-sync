@@ -1,19 +1,3 @@
-"""
-🚀 conterp-paid-sync - Integração Alterdata → Monday
-
-Fluxo atual:
-1. Valida variáveis de ambiente
-2. Busca Centros de Custo da Alterdata
-3. Busca Pagamentos Realizados no Alterdata
-4. Filtra Pagamentos Realizados pelo semestre atual
-5. Busca ID's existentes no Monday
-6. Compara para achar novos IDs
-7. Enriquece novos pagamentos com todos os dados
-8. Sobe pro Monday os Novos Pagamentos
-9. Limpa duplicados no Monday
-10. Remove 'órfãos' (itens no Monday que não estão no Alterdata do semestre)
-"""
-
 import json
 from src.config.settings import (
     check_required_envs,

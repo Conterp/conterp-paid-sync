@@ -66,9 +66,12 @@ def get_title_details(session: requests.Session, titulo_id: str, dict_cc: dict):
 
     # ---- Observação e AF/RQ ----
     observacao = obj.get("Observacao", "") or ""
-    match_af = re.search(r"\bAF\s\d{6}\b", observacao, re.IGNORECASE)
-    match_rq = re.search(r"\bRQ\s\d{6}\b", observacao, re.IGNORECASE)
-    af_number = (match_af or match_rq).group().upper() if (match_af or match_rq) else "Sem AF"
+    
+    # Procura AF ou RQ seguidos de número
+    match = re.search(r"\b(?:AF|RQ)\s*(\d+)\b", observacao, re.IGNORECASE)
+
+    # Se encontrou, pega só o número (grupo 1)
+    af_number = match.group(1) if match else "Sem AF"
 
     # ---- Campos principais ----
     data_baixa = obj.get("DataBaixa")
