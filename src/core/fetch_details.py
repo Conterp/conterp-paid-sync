@@ -34,6 +34,37 @@ def build_session(token: str, max_retries: int = 5, backoff_factor: float = 2.0)
 
 
 # ==========================
+# 🧹 Tratamento de datas
+# ==========================
+def parse_data_segura(valor):
+    """
+    Evita enviar datas inválidas como 1-01-01, 0001-01-01 ou NaT.
+    Retorna Timestamp válido ou None.
+    """
+    if valor is None:
+        return None
+
+    if isinstance(valor, str):
+        valor_limpo = valor.strip()
+
+        if not valor_limpo:
+            return None
+
+        if valor_limpo in ["1-01-01", "0001-01-01", "0001-01-01T00:00:00"]:
+            return None
+
+        if valor_limpo.startswith("0001"):
+            return None
+
+    data = pd.to_datetime(valor, errors="coerce")
+
+    if pd.isna(data):
+        return None
+
+    return data
+
+
+# ==========================
 # 🔍 Função para 1 título
 # ==========================
 def get_title_details(session: requests.Session, titulo_id: str, dict_cc: dict):
@@ -57,7 +88,14 @@ def get_title_details(session: requests.Session, titulo_id: str, dict_cc: dict):
     for item in obj.get("Itens", []):
         centros.extend(item.get("CentrosDeCusto", []) or [])
 
-    nomes_cc = [dict_cc.get(cc.get("IdentificadorCentroDeCusto")) for cc in centros if cc.get("IdentificadorCentroDeCusto")]
+    nomes_cc = [
+        dict_cc.get(cc.get("IdentificadorCentroDeCusto"))
+        for cc in centros
+        if cc.get("IdentificadorCentroDeCusto")
+    ]
+
+    nomes_cc = [nome for nome in nomes_cc if nome]
+
     nome_cc_final = (
         None if not nomes_cc else
         nomes_cc[0] if len(set(nomes_cc)) == 1 else
@@ -66,7 +104,7 @@ def get_title_details(session: requests.Session, titulo_id: str, dict_cc: dict):
 
     # ---- Observação e AF/RQ ----
     observacao = obj.get("Observacao", "") or ""
-    
+
     # Procura AF ou RQ seguidos de número
     match = re.search(r"\b(?:AF|RQ)\s*(\d+)\b", observacao, re.IGNORECASE)
 
@@ -74,17 +112,20 @@ def get_title_details(session: requests.Session, titulo_id: str, dict_cc: dict):
     af_number = match.group(1) if match else "Sem AF"
 
     # ---- Campos principais ----
-    data_baixa = obj.get("DataBaixa")
-    if not data_baixa or (isinstance(data_baixa, str) and data_baixa.startswith("0001")):
+    data_baixa = parse_data_segura(obj.get("DataBaixa"))
+    if data_baixa is None:
         return None
+
+    data_cadastro = parse_data_segura(obj.get("DataCadastro"))
+    data_vencimento = parse_data_segura(obj.get("DataVencimento"))
 
     return {
         "Numero af": af_number,
         "Nome da pessoa": obj.get("Descricao"),
         "Nome curto": " ".join((obj.get("Descricao") or "").split()[:2]),
-        "Data de Cadastro": pd.to_datetime(obj.get("DataCadastro"), errors="coerce"),
-        "Dt. venc. original": pd.to_datetime(obj.get("DataVencimento"), errors="coerce"),
-        "Dt. da Realização": pd.to_datetime(data_baixa, errors="coerce"),
+        "Data de Cadastro": data_cadastro,
+        "Dt. venc. original": data_vencimento,
+        "Dt. da Realização": data_baixa,
         "Vl. título (atualizado)": obj.get("Valor"),
         "Vl. líquido": obj.get("ValorBaixado"),
         "Forma de Pagamento": (obj.get("FormaPagamento") or {}).get("Nome"),

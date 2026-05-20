@@ -1,6 +1,7 @@
 import requests
 import json
 import time
+import pandas as pd
 from tqdm import tqdm
 from src.config.settings import (
     MONDAY_BASE_URL,
@@ -22,6 +23,70 @@ HEADERS = {
     "Authorization": MONDAY_API_TOKEN,
     "Content-Type": "application/json"
 }
+
+
+# =========================================
+# 🧹 HELPERS PARA EVITAR PAYLOAD INVÁLIDO
+# =========================================
+def valor_valido(valor):
+    if valor is None:
+        return False
+
+    try:
+        if pd.isna(valor):
+            return False
+    except (TypeError, ValueError):
+        pass
+
+    if isinstance(valor, str):
+        valor = valor.strip()
+        if not valor:
+            return False
+        if valor.lower() in ["nan", "nat", "none", "null"]:
+            return False
+
+    return True
+
+
+def texto_monday(valor):
+    if not valor_valido(valor):
+        return None
+    return str(valor).strip()
+
+
+def numero_monday(valor):
+    if not valor_valido(valor):
+        return None
+    return str(valor)
+
+
+def data_monday(valor):
+    if not valor_valido(valor):
+        return None
+
+    if isinstance(valor, str):
+        valor_limpo = valor.strip()
+
+        if valor_limpo in ["1-01-01", "0001-01-01", "0001-01-01T00:00:00"]:
+            return None
+
+        if valor_limpo.startswith("0001"):
+            return None
+
+    data = pd.to_datetime(valor, errors="coerce")
+
+    if pd.isna(data):
+        return None
+
+    return {"date": data.strftime("%Y-%m-%d")}
+
+
+def dropdown_monday(valor):
+    valor = texto_monday(valor)
+    if not valor:
+        return None
+    return {"labels": [valor]}
+
 
 # =========================================
 # 🚀 FUNÇÃO PARA CRIAR ITEM NO MONDAY
@@ -55,25 +120,32 @@ def criar_item_monday(row):
     # 🧱 Monta os valores das colunas
     # -----------------------------------------
     col_vals = {
-        "text_mknh23aa": row.get("Nome da pessoa"),
-        "text_mknhys8v": row.get("Nome curto"),
-        "date_mknhf7dr": {"date": str(row.get("Dt. venc. original")) if row.get("Dt. venc. original") else None},
-        "date_mknhk9yy": {"date": str(row.get("Dt. da Realização")) if row.get("Dt. da Realização") else None},
-        "numeric_mknhx7xx": str(row.get("Vl. título (atualizado)") or ""),
-        "numeric_mknh5gyx": str(row.get("Vl. líquido") or ""),
-        "dropdown_mkqj16vc": {"labels": [row.get("Forma de Pagamento")]} if row.get("Forma de Pagamento") else None,
-        "dropdown_mkqjnn18": {"labels": [row.get("Centro(s) de custo")]} if row.get("Centro(s) de custo") else None,
-        "text_mknh7b0j": row.get("Nº Título"),
-        "numeric_mknh99sh": str(row.get("Vl. desconto desmembramento") or ""),
-        "numeric_mknhca65": str(row.get("Vl. PIS x COFINS x CSLL") or ""),
-        "numeric_mknharz2": str(row.get("Vl. IRRF") or ""),
-        "numeric_mknhqxpq": str(row.get("Vl. INSS") or ""),
-        "numeric_mknhd7ss": str(row.get("Vl. ISS") or ""),
-        "numeric_mknh8w8m": str(row.get("Vl. multa desmembramento") or ""),
-        "numeric_mknhhe99": str(row.get("Vl. juros desmembramento") or ""),
-        "text_mknh5an4": row.get("Observação"),
-        "dropdown_mkqj1npx": {"labels": [row.get("TIPO DE OPERAÇÃO")]} if row.get("TIPO DE OPERAÇÃO") else None,
-        "text_mktkv6ct": row.get("ID"),
+        "text_mknh23aa": texto_monday(row.get("Nome da pessoa")),
+        "text_mknhys8v": texto_monday(row.get("Nome curto")),
+
+        "date_mknhf7dr": data_monday(row.get("Dt. venc. original")),
+        "date_mknhk9yy": data_monday(row.get("Dt. da Realização")),
+
+        "numeric_mknhx7xx": numero_monday(row.get("Vl. título (atualizado)")),
+        "numeric_mknh5gyx": numero_monday(row.get("Vl. líquido")),
+
+        "dropdown_mkqj16vc": dropdown_monday(row.get("Forma de Pagamento")),
+        "dropdown_mkqjnn18": dropdown_monday(row.get("Centro(s) de custo")),
+
+        "text_mknh7b0j": texto_monday(row.get("Nº Título")),
+
+        "numeric_mknh99sh": numero_monday(row.get("Vl. desconto desmembramento")),
+        "numeric_mknhca65": numero_monday(row.get("Vl. PIS x COFINS x CSLL")),
+        "numeric_mknharz2": numero_monday(row.get("Vl. IRRF")),
+        "numeric_mknhqxpq": numero_monday(row.get("Vl. INSS")),
+        "numeric_mknhd7ss": numero_monday(row.get("Vl. ISS")),
+        "numeric_mknh8w8m": numero_monday(row.get("Vl. multa desmembramento")),
+        "numeric_mknhhe99": numero_monday(row.get("Vl. juros desmembramento")),
+
+        "text_mknh5an4": texto_monday(row.get("Observação")),
+        "dropdown_mkqj1npx": dropdown_monday(row.get("TIPO DE OPERAÇÃO")),
+
+        "text_mktkv6ct": texto_monday(row.get("ID")),
     }
 
     col_vals = {k: v for k, v in col_vals.items() if v is not None}
@@ -81,8 +153,8 @@ def criar_item_monday(row):
     variables = {
         "board": BOARD_ID,
         "group": grupo_escolhido,
-        "item_name": row.get("Numero af", "Sem nome"),
-        "column_values": json.dumps(col_vals)
+        "item_name": texto_monday(row.get("Numero af")) or "Sem nome",
+        "column_values": json.dumps(col_vals, ensure_ascii=False, allow_nan=False)
     }
 
     # -----------------------------------------
