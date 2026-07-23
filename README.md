@@ -1,88 +1,101 @@
 # 💸 Conterp Paid Sync
 
-> Integração automatizada entre **Alterdata (Bimer)** e **Monday.com**, para sincronizar pagamentos e lançamentos financeiros com eficiência, confiabilidade e rastreabilidade.
+> Integração automatizada entre **Alterdata (Bimer)** e **Monday.com** para sincronizar pagamentos realizados com eficiência, confiabilidade e rastreabilidade.
 
 ---
 
 ## 🚀 Visão geral
 
-O **Conterp Paid Sync** elimina o retrabalho manual na conciliação de **Pagamentos Realizados** entre o Bimer da **Alterdata** e a **Monday.com**.  
-A automação coleta, trata e sincroniza os pagamentos de forma segura, garantindo **dados atualizados**, **logs rastreáveis** e **execuções agendadas em produção**.
+O **Conterp Paid Sync** elimina o retrabalho manual na conciliação de **Pagamentos Realizados** entre o Bimer da **Alterdata** e o **Monday.com**.
+
+A automação coleta, trata e sincroniza os pagamentos, mantendo os dados atualizados e registrando o resultado de cada execução no **Apache Airflow**.
 
 ---
 
 ## 🧠 Principais recursos
 
-- 🔄 **Sincronização automatizada** de Pagamentos Realizados do **Alterdata (Bimer)** para **Monday.com**  
-- 🧾 **Tratamento inteligente** dos lançamentos (grupos, status e colunas do board)  
-- 🧰 **Configuração simples** via `.env`  
-- 📊 **Progresso em tempo real** com `tqdm`  
-- 🐳 **Execução isolada com Docker**  
-- ⏰ **Agendamento via cron** (produção em AWS/EC2)  
-- 💬 **Envio automático de relatórios** ao Email via **n8n**  
-- 🧩 **Arquitetura modular e extensível**  
-- 🧹 **Higiene de dados no Monday**: remoção de **duplicidades por ID** e exclusão de **itens órfãos** a cada execução, garantindo **idempotência**
+- 🔄 Sincronização de Pagamentos Realizados do **Alterdata (Bimer)** para o **Monday.com**
+- 🧾 Tratamento de grupos, status e colunas do board
+- 🧹 Remoção de duplicidades por ID e itens órfãos
+- 📊 Resumo estruturado com itens planejados, processados e com erro
+- 🧰 Configuração por variáveis de ambiente
+- 📈 Progresso em tempo real com `tqdm`
+- 🐳 Execução isolada com Docker
+- 🌬️ Orquestração e monitoramento pelo Apache Airflow
+- 💬 Envio do resumo ao **n8n** e notificação pelo **WhatsApp**
+- 🧩 Arquitetura modular e extensível
+- 🔁 Processamento idempotente
 
 ---
 
 ## 🧩 Estrutura do projeto
 
-### Itens na **raiz** do repositório
+### Itens na raiz do repositório
 
-```
+```text
 conterp-paid-sync/
-├── .env.example          # Exemplo de variáveis de ambiente
+├── .env.example
+├── .dockerignore
 ├── .gitignore
-├── Dockerfile            # Imagem da automação (python:3.12-slim)
-├── docker-compose.yml    # Orquestra a execução do container
-├── requirements.txt      # Dependências
+├── Dockerfile
+├── docker-compose.yml
+├── requirements.txt
 ├── README.md
-├── logs/                 # (gerado em runtime) diretório de logs por execução
-└── src/                  # Código-fonte principal
+└── src/
 ```
 
-### Árvore do `src/`
+### Árvore principal do `src/`
 
-```
+```text
 src/
-├── main.py                      # Ponto de entrada (pipeline fim-a-fim)
+├── main.py
 ├── config/
-│   └── settings.py              # Carrega .env e valida variáveis
+│   └── settings.py
 ├── core/
-│   ├── auth.py                  # Login no Bimer (token)
-│   ├── fetch_cost_centers.py    # Centros de Custo (id→nome)
-│   ├── fetch_alterdata.py       # Títulos baixados (paginado + retry + paralelo)
-│   ├── fetch_details.py         # Detalhes de um título (enriquecimento)
-│   ├── fetch_monday.py          # Leitura GraphQL (paginada por cursor)
-│   ├── compare_ids.py           # Novos (A∖M) e órfãos (M∖A)
-│   ├── create_items_monday.py   # Criação de itens (GraphQL)
-│   └── delete_items_monday.py   # Remoção de duplicados e órfãos
-├── postprocess/
-│   └── send_log_to_n8n.py       # 📤 Resumo de log → n8n → Email
+│   ├── auth.py
+│   ├── fetch_cost_centers.py
+│   ├── fetch_alterdata.py
+│   ├── fetch_details.py
+│   ├── fetch_monday.py
+│   ├── compare_ids.py
+│   ├── create_items_monday.py
+│   ├── delete_items_monday.py
+│   └── summary/
+│       └── build_execution_summary.py
+├── webhook/
+│   └── # Envio do resumo da execução ao n8n
 └── utils/
-    ├── date_filters.py          # Intervalo do semestre atual + filtro
-    └── detect_duplicates_monday.py # Diagnóstico de duplicidade (board)
+    ├── date_filters.py
+    └── detect_duplicates_monday.py
 ```
 
-> 🗂️ Observação: `logs/` fica **fora** de `src/` e guarda um arquivo por execução (nomeado por data/hora).
+### Responsabilidades principais
+
+- `main.py`: executa o pipeline completo.
+- `create_items_monday.py`: cria novos pagamentos no Monday e retorna o resultado de cada item.
+- `delete_items_monday.py`: remove duplicidades e itens órfãos.
+- `build_execution_summary.py`: consolida sucessos, erros e duração do pipeline.
+- `webhook/`: envia o resumo estruturado ao n8n.
 
 ---
 
 ## ⚙️ Configuração
 
-### 1) Clone o repositório
+### 1. Clone o repositório
+
 ```bash
 git clone git@github.com:Conterp/conterp-paid-sync.git
 cd conterp-paid-sync
 ```
 
-### 2) Configure o `.env`
-Copie o exemplo:
+### 2. Configure o `.env`
+
 ```bash
 cp .env.example .env
 ```
 
-Preencha com suas credenciais da **Alterdata**, **Monday.com** e o **webhook do n8n** (exemplo ilustrativo):
+Exemplo:
+
 ```env
 # Alterdata / Bimer
 ALTERDATA_USER=seu.usuario
@@ -97,115 +110,126 @@ MONDAY_COLUMN_ID=coluna_id_primaria
 MONDAY_GROUP_PADRAO=group_default
 MONDAY_GROUP_MOVBCO=group_movbco
 
-# Observabilidade (opcional)
+# Monitoramento
 N8N_WEBHOOK_URL=https://seu-endereco-n8n/webhook/conterp-paid-sync
 ```
 
-> 💡 O `.env` já está no `.gitignore`.
+> O arquivo `.env` não deve ser versionado e já está incluído no `.gitignore` e no `.dockerignore`.
 
 ---
 
 ## 🧭 Execução
 
-### 🔹 Local (desenvolvimento)
+### Desenvolvimento
+
 ```bash
 docker compose up --build
 ```
 
-### 🔹 Produção (AWS EC2)
-Use um script (ex.: `run.sh`) para executar, gerar logs e enviar o resumo ao **n8n**.  
-Exemplo de caminho no servidor:
-```
-/opt/automations/conterp-paid-sync/run.sh
-```
-
-Logs gerados em:
-```
-/opt/automations/conterp-paid-sync/logs/
-```
-
----
-
-## 🧰 Exemplo de `run.sh.example`
-
-> Modelo para testes locais (ajuste paths conforme seu ambiente).
+### Build da imagem em produção
 
 ```bash
-#!/bin/bash
-# Caminho base
-cd /opt/automations/conterp-paid-sync
-
-# Timezone Brasil
-export TZ="America/Sao_Paulo"
-
-# Nome do log (data/hora)
-LOG_FILE="logs/cron_$(date '+%Y-%m-%d_%H-%M').log"
-
-# Executa e salva log
-/usr/bin/docker compose up --build --abort-on-container-exit > "$LOG_FILE" 2>&1
-
-echo "📤 Enviando resumo do log para o n8n..."
-
-docker run --rm   -v /workspaces/conterp-paid-sync/logs:/app/logs   -v /workspaces/conterp-paid-sync/src:/app   --env-file /workspaces/conterp-paid-sync/.env   -e LOG_PATH="/app/logs/teste_envio.log"   -w /app python:3.12-slim /bin/bash -c   "pip install requests python-dotenv >/dev/null 2>&1 && python -m postprocess.send_log_to_n8n"
-
-echo '✅ Log enviado com sucesso!'
+docker compose build --no-cache
 ```
 
-> 🧠 Em produção, use os caminhos reais do EC2 (`/opt/automations/...`).
+Imagem gerada:
 
----
-
-## 💬 Integração com n8n e Email
-
-Ao fim da execução, o **Conterp Paid Sync** envia um resumo do log ao **n8n**, que formata e encaminha ao **Email** (UX por **JAMI**).  
-Exemplo de mensagem:
-
+```text
+conterp-paid-sync-app:latest
 ```
-Tudo pronto por aqui 🚀
 
-📅 14/10/2025 às 19:18
-💼 Pagamentos no Monday
-• Antes: 4070
-• Depois: 4106 (+36)
-• Duplicados removidos: 0
+### Execução direta
 
-📊 Grupos:
-• Pagamentos: 36
-• MOVBCO: 0
-
-🧾 Total Alterdata (semestre): 4106
-Processo finalizado com sucesso 🌟 Sistemas 100% alinhados.
+```bash
+docker run --rm \
+  --env-file /opt/automations/conterp-paid-sync/.env \
+  conterp-paid-sync-app:latest
 ```
 
 ---
 
-## ⏰ Agendamento (cron)
+## 🌬️ Execução pelo Apache Airflow
 
-Exemplo de agenda na EC2:
+A automação é executada pelo Airflow por meio da DAG:
 
-```
-# Segunda a sexta: 04:00, 10:30 e 19:00
-0 4 * * 1-5 /opt/automations/conterp-paid-sync/run.sh
-30 10 * * 1-5 /opt/automations/conterp-paid-sync/run.sh
-0 19 * * 1-5 /opt/automations/conterp-paid-sync/run.sh
-
-# Sábado: 10:30
-30 10 * * 6 /opt/automations/conterp-paid-sync/run.sh
+```text
+conterp_paid_sync
 ```
 
-Cada execução gera um log nomeado por data/hora, por exemplo:
+Arquivo da DAG:
+
+```text
+conterp_paid_sync_dag.py
 ```
-logs/cron_2025-10-13_04-00.log
+
+Task:
+
+```text
+run_conterp_paid_sync_pipeline
 ```
+
+Os logs de cada execução ficam disponíveis diretamente na interface do Airflow.
+
+---
+
+## 💬 Integração com n8n e WhatsApp
+
+Ao final do pipeline, o sistema gera um resumo contendo:
+
+- itens planejados para criação;
+- itens criados com sucesso;
+- erros de criação;
+- duplicidades removidas;
+- itens órfãos removidos;
+- duração total;
+- status geral da execução.
+
+O resumo é enviado ao **n8n**, que processa os dados e encaminha a notificação pelo **WhatsApp**.
+
+Erros individuais são registrados no resumo sem interromper todo o processamento. Erros fatais encerram a execução com falha.
+
+---
+
+## ⏰ Agendamento
+
+A DAG é executada de **segunda a sábado**, nos seguintes horários:
+
+```text
+04:00
+10:00
+19:00
+```
+
+Expressão cron utilizada pelo Airflow:
+
+```cron
+0 4,10,19 * * 1-6
+```
+
+Timezone:
+
+```text
+America/Sao_Paulo
+```
+
+O Airflow está configurado com:
+
+- `catchup=False`
+- uma tentativa adicional em caso de falha;
+- intervalo de 10 minutos entre tentativas;
+- apenas uma execução ativa da DAG por vez.
 
 ---
 
 ## 🔒 Segurança
 
-- Credenciais isoladas via `.env`  
-- Execução conteinerizada (Docker)  
-- Logs organizados por execução (sem dados sensíveis)  
-- Resumo de logs enviado ao n8n (sem vazar segredos)
+- Credenciais isoladas no arquivo `.env`
+- `.env` excluído da imagem Docker
+- Execução conteinerizada
+- Logs centralizados no Airflow
+- Webhook configurado por variável de ambiente
+- Nenhum segredo incluído no código-fonte
+- Resumo enviado ao n8n sem exposição de credenciais
 
 ---
 
